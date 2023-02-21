@@ -639,43 +639,49 @@ const char *Recognizer::WordandPhoneResult(CompactLattice &rlat)
         if ((samples_round_start_ / sample_frequency_ + (frame_offset_ + (times[i].second-times[i].first)) * 0.03) > 0.0 && phone_ptr < phon_vec_size) {
             
             word["word"] = model_->word_syms_->Find(word_ids[i]);
-            word["start"] = samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].first) * 0.03;
-            word["end"] = samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].second) * 0.03;
-            word["conf"] = conf[i];
-            word["lm_cost"] = lm_costs[phone_ptr]; 
-            word["acoustic_cost"] = acoustic_costs[phone_ptr];
-            
+			if (verbose_) {
+				word["start"] = samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].first) * 0.03;
+				word["end"] = samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].second) * 0.03;
+				word["conf"] = conf[i];
+				word["lm_cost"] = lm_costs[phone_ptr]; 
+				word["acoustic_cost"] = acoustic_costs[phone_ptr];
+			}
+
             kaldi::BaseFloat phone_start_time = 0.0;
             kaldi::BaseFloat phone_end_time = 0.0;
                         
             //If there are silences without phone output (since they are coming from different places) then set the label and timestamps
             if (word_ids[i] == 0 && phoneme_labels[phone_ptr][0] != "SIL"){
-                word["phone_label"].append( "SIL" );
-                phone_start_time=samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].first) * 0.03;
-                phone_end_time = samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].second) * 0.03;
-                word["phone_start"].append( phone_start_time );
-                word["phone_end"].append( phone_end_time );
+                word["phone_labels"].append( "SIL" );
+				if (verbose_) {
+					phone_start_time=samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].first) * 0.03;
+					phone_end_time = samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].second) * 0.03;
+					word["phone_start"].append( phone_start_time );
+					word["phone_end"].append( phone_end_time );
+				}
             }
 
             //Else add the information generated from ComputePhoneInfo to results
             else {
                 for ( auto phone: phoneme_labels[phone_ptr]){
 
-                    word["phone_label"].append( phone );
+                    word["phone_labels"].append( phone );
                 }
-                //Compute timestamps from phone lengths                               
-                for (int x=0; x < phone_lengths[phone_ptr].size(); x++){
-                    if (x==0){
-                        phone_start_time=samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].first) * 0.03;
-                        phone_end_time = phone_start_time + (phone_lengths[phone_ptr][x]) * 0.03;
-                    }
-                    else{
-                        phone_start_time = phone_end_time;
-                        phone_end_time = phone_start_time + (phone_lengths[phone_ptr][x]) * 0.03;
-                    }
-                    word["phone_start"].append( phone_start_time );
-                    word["phone_end"].append( phone_end_time );
-                }               
+                //Compute timestamps from phone lengths        
+				if (verbose_) {
+					for (int x=0; x < phone_lengths[phone_ptr].size(); x++){
+						if (x==0){
+							phone_start_time=samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].first) * 0.03;
+							phone_end_time = phone_start_time + (phone_lengths[phone_ptr][x]) * 0.03;
+						}
+						else{
+							phone_start_time = phone_end_time;
+							phone_end_time = phone_start_time + (phone_lengths[phone_ptr][x]) * 0.03;
+						}
+						word["phone_start"].append( phone_start_time );
+						word["phone_end"].append( phone_end_time );
+					}               
+				}
                 phone_ptr += 1;
             }                
                    
@@ -809,8 +815,10 @@ const char *Recognizer::NbestResult(CompactLattice &clat)
             continue;
         if (words_) {
             word["word"] = model_->word_syms_->Find(words[i]);
-            word["start"] = samples_round_start_ / sample_frequency_ + (frame_offset_ + begin_times[i]) * 0.03;
-            word["end"] = samples_round_start_ / sample_frequency_ + (frame_offset_ + begin_times[i] + lengths[i]) * 0.03;
+			if (verbose_) {
+				word["start"] = samples_round_start_ / sample_frequency_ + (frame_offset_ + begin_times[i]) * 0.03;
+				word["end"] = samples_round_start_ / sample_frequency_ + (frame_offset_ + begin_times[i] + lengths[i]) * 0.03;
+			}
             entry["result"].append(word);
         }
 
@@ -953,6 +961,8 @@ const char* Recognizer::GetResult()
         else{             
             KALDI_ERR << "Cannot generate phone results as phone symbol table was not provided";
         }
+	}else if (max_alternatives_ == 0) {
+		return MbrResult(rlat);
     } else if (strcmp(result_opts_, "words")!=0 && strcmp(result_opts_, "phones")!=0){        
         KALDI_ERR << "Invalid recognizer result options";
     } else if (nlsml_) {
