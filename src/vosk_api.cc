@@ -163,6 +163,11 @@ const char *vosk_recognizer_partial_result(VoskRecognizer *recognizer)
     return ((Recognizer *)recognizer)->PartialResult();
 }
 
+const char *vosk_recognizer_partial_phone_result(VoskRecognizer *recognizer)
+{
+	return ((Recognizer *)recognizer)->PartialPhoneResult();
+}
+
 const char *vosk_recognizer_final_result(VoskRecognizer *recognizer)
 {
     return ((Recognizer *)recognizer)->FinalResult();

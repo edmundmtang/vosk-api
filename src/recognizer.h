@@ -58,6 +58,7 @@ class Recognizer {
         const char* Result();
         const char* FinalResult();
         const char* PartialResult();
+		const char* PartialPhoneResult();
         void Reset();
         
     private:
@@ -67,6 +68,7 @@ class Recognizer {
         void UpdateSilenceWeights();
         bool AcceptWaveform(Vector<BaseFloat> &wdata);
         bool GetSpkVector(Vector<BaseFloat> &out_xvector, int *frames);
+		void PhoneResult(CompactLattice &rlat, std::vector<std::vector<std::string> > *phoneme_labels);
         const char *GetResult();
         const char *StoreEmptyReturn();
         const char *StoreReturn(const string &res);

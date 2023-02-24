@@ -568,6 +568,14 @@ static bool CompactLatticeToWordPronsWeight(
  }
 
 
+ void ComputePhoneSequence(CompactLattice &clat, std::vector<std::vector<std::string> > *phoneme_labels)
+ {
+	// should do the same as ComputePhoneInfo, just leaner
+	
+	
+	
+ }
+ 
 void ComputePhoneInfo(const TransitionModel &tmodel, const CompactLattice &clat, const fst::SymbolTable &word_syms_, const fst::SymbolTable &phone_symbol_table_, std::vector<std::vector<std::string> > *phoneme_labels, std::vector<std::vector<int32> > *phone_lengths, std::vector<kaldi::BaseFloat> *lm_costs, std::vector<kaldi::BaseFloat> *acoustic_costs)
 {    
     // This function computes the phone information i.e. phone labels and lengths
@@ -596,6 +604,23 @@ void ComputePhoneInfo(const TransitionModel &tmodel, const CompactLattice &clat,
       phoneme_labels->push_back(word2phn);
      }
     
+}
+
+void Recognizer::PhoneResult(CompactLattice &rlat, std::vector<std::vector<std::string> > *phoneme_labels)
+ {
+	CompactLattice aligned_lat;
+    if (model_->winfo_) {
+        WordAlignLattice(rlat, *model_->trans_model_, *model_->winfo_, 0, &aligned_lat);
+    } else {
+        aligned_lat = rlat;
+    }
+	
+	std::vector<std::vector<int32> > phone_lengths;
+    std::vector<kaldi::BaseFloat> lm_costs;
+    std::vector<kaldi::BaseFloat> acoustic_costs;
+	
+	ComputePhoneInfo(*model_->trans_model_, aligned_lat, *model_->word_syms_, *model_->phone_symbol_table_, phoneme_labels, &phone_lengths, &lm_costs, &acoustic_costs);	
+	// change to ComputePhoneSequence later
 }
 
 const char *Recognizer::WordandPhoneResult(CompactLattice &rlat)
@@ -1007,6 +1032,42 @@ const char* Recognizer::PartialResult()
     res["partial"] = text.str();
 
     return StoreReturn(res.dump());
+}
+
+const char* Recognizer::PartialPhoneResult()
+{
+	if (state_ != RECOGNIZER_RUNNING) {
+		return StoreEmptyReturn();
+	}
+	
+	json::JSON res;
+	
+	if (decoder_->NumFramesDecoded() == 0) {
+		res["phone_labels"] = "";
+		return StoreReturn(res.dump());
+	}
+	
+	CompactLattice clat;
+	decoder_->GetLattice(false, &clat);
+	
+	// Pruned composition can return empty lattice. It should be rare
+	//   But can a normal clat do this? Not sure
+	if (clat.Start() != 0) {
+       return StoreEmptyReturn();
+    }
+	
+	std::vector<std::vector<std::string> > phoneme_labels;
+	const fst::SymbolTable phone_symbol_table_ = *model_->phone_symbol_table_;
+	PhoneResult(clat, &phoneme_labels);
+	
+	for (size_t z = 0; z < phoneme_labels.size(); z++) {
+		for (size_t j = 0; j < phoneme_labels[z].size(); j++) {
+			auto phone_str = phoneme_labels[z][j];
+			res["phone_labels"].append(phone_str);
+		}
+	}
+	
+	return StoreReturn(res.dump());
 }
 
 const char* Recognizer::Result()
