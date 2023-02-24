@@ -568,12 +568,33 @@ static bool CompactLatticeToWordPronsWeight(
  }
 
 
- void ComputePhoneSequence(CompactLattice &clat, std::vector<std::vector<std::string> > *phoneme_labels)
- {
-	// should do the same as ComputePhoneInfo, just leaner
+ void ComputePhoneSequence(const TransitionModel &tmodel, const CompactLattice &clat, const fst::SymbolTable &phone_symbol_table_, std::vector<std::string> *phoneme_labels, std::vector<int32> *phoneme_lengths)
+{
+	// This function computes just the phone information i.e. phone labels and lengths
+	// as single vectors
+    vector<int32> words_ph_ids, times_lat, lengths;
+    vector<vector<int32> > prons, prons_lens;
 	
+
+    kaldi::CompactLattice best_path;
+    kaldi::CompactLatticeShortestPath(clat, &best_path);
 	
-	
+	std::vector<kaldi::BaseFloat> lm_costs; // unneeded
+    std::vector<kaldi::BaseFloat> acoustic_costs; // unneeded
+
+    CompactLatticeToWordPronsWeight(tmodel, best_path, &words_ph_ids, &times_lat, &lengths,
+                                       &prons, &prons_lens, &lm_costs, &acoustic_costs);
+    
+
+    for (size_t z = 0; z < words_ph_ids.size(); z++) {
+		for (size_t j = 0; j < prons[z].size(); j++) {   
+			auto phone_str = phone_symbol_table_.Find(prons[z][j]); 
+			phoneme_labels->push_back(phone_str);
+			auto phone_len = prons_lens[z][j];
+			phoneme_lengths->push_back(phone_len);
+		}
+	}
+
  }
  
 void ComputePhoneInfo(const TransitionModel &tmodel, const CompactLattice &clat, const fst::SymbolTable &word_syms_, const fst::SymbolTable &phone_symbol_table_, std::vector<std::vector<std::string> > *phoneme_labels, std::vector<std::vector<int32> > *phone_lengths, std::vector<kaldi::BaseFloat> *lm_costs, std::vector<kaldi::BaseFloat> *acoustic_costs)
@@ -606,7 +627,7 @@ void ComputePhoneInfo(const TransitionModel &tmodel, const CompactLattice &clat,
     
 }
 
-void Recognizer::PhoneResult(CompactLattice &rlat, std::vector<std::vector<std::string> > *phoneme_labels)
+const char * Recognizer::PhoneResult(CompactLattice &rlat)
  {
 	CompactLattice aligned_lat;
     if (model_->winfo_) {
@@ -615,12 +636,25 @@ void Recognizer::PhoneResult(CompactLattice &rlat, std::vector<std::vector<std::
         aligned_lat = rlat;
     }
 	
-	std::vector<std::vector<int32> > phone_lengths;
+	std::vector<std::string> phoneme_labels;
+	std::vector<int32> phoneme_lengths;
     std::vector<kaldi::BaseFloat> lm_costs;
     std::vector<kaldi::BaseFloat> acoustic_costs;
 	
-	ComputePhoneInfo(*model_->trans_model_, aligned_lat, *model_->word_syms_, *model_->phone_symbol_table_, phoneme_labels, &phone_lengths, &lm_costs, &acoustic_costs);	
+	ComputePhoneSequence(*model_->trans_model_, aligned_lat, *model_->phone_symbol_table_, &phoneme_labels, &phoneme_lengths);	
 	// change to ComputePhoneSequence later
+	
+	json::JSON res;
+	int32 time = 0;
+	
+	for (size_t k = 0; k < phoneme_labels.size(); k++) {
+		res["phone_labels"].append(phoneme_labels[k]);
+		res["phone_start"].append(time * 0.03);
+		time += phoneme_lengths[k];
+		res["phone_end"].append(time * 0.03);
+	}
+	
+	return StoreReturn(res.dump());
 }
 
 const char *Recognizer::WordandPhoneResult(CompactLattice &rlat)
@@ -1049,19 +1083,10 @@ const char* Recognizer::PartialPhoneResult()
 	if (clat.Start() != 0) {
        return StoreEmptyReturn();
     }
+		
+	PhoneResult(clat);
 	
-	std::vector<std::vector<std::string> > phoneme_labels;
-	const fst::SymbolTable phone_symbol_table_ = *model_->phone_symbol_table_;
-	PhoneResult(clat, &phoneme_labels);
-	
-	for (size_t z = 0; z < phoneme_labels.size(); z++) {
-		for (size_t j = 0; j < phoneme_labels[z].size(); j++) {
-			auto phone_str = phoneme_labels[z][j];
-			res["phone_labels"].append(phone_str);
-		}
-	}
-	
-	return StoreReturn(res.dump());
+	return last_result_.c_str();
 }
 
 const char* Recognizer::Result()

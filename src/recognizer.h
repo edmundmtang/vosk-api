@@ -68,11 +68,11 @@ class Recognizer {
         void UpdateSilenceWeights();
         bool AcceptWaveform(Vector<BaseFloat> &wdata);
         bool GetSpkVector(Vector<BaseFloat> &out_xvector, int *frames);
-		void PhoneResult(CompactLattice &rlat, std::vector<std::vector<std::string> > *phoneme_labels);
         const char *GetResult();
         const char *StoreEmptyReturn();
         const char *StoreReturn(const string &res);
         const char *MbrResult(CompactLattice &clat);
+		const char *PhoneResult(CompactLattice &rlat);
         const char *WordandPhoneResult(CompactLattice &clat);
         const char *NbestResult(CompactLattice &clat);
         const char *NlsmlResult(CompactLattice &clat);
