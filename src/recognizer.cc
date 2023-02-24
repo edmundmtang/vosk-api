@@ -479,6 +479,77 @@ const char *Recognizer::MbrResult(CompactLattice &rlat)
     return StoreReturn(obj.dump());
 }
 
+//Copied from "lat/lattice-functions.cc" online because my
+//version from vosk is missing this method
+bool CompactLatticeToWordProns(
+     const TransitionModel &tmodel,
+     const CompactLattice &clat,
+     std::vector<int32> *words,
+     std::vector<int32> *begin_times,
+     std::vector<int32> *lengths,
+     std::vector<std::vector<int32> > *prons,
+     std::vector<std::vector<int32> > *phone_lengths) {
+   words->clear();
+   begin_times->clear();
+   lengths->clear();
+   prons->clear();
+   phone_lengths->clear();
+   typedef CompactLattice::Arc Arc;
+   typedef Arc::Label Label;
+   typedef CompactLattice::StateId StateId;
+   typedef CompactLattice::Weight Weight;
+   using namespace fst;
+   StateId state = clat.Start();
+   int32 cur_time = 0;
+   if (state == kNoStateId) {
+     KALDI_WARN << "Empty lattice.";
+     return false;
+   }
+   while (1) {
+     Weight final = clat.Final(state);
+     size_t num_arcs = clat.NumArcs(state);
+     if (final != Weight::Zero()) {
+       if (num_arcs != 0) {
+         KALDI_WARN << "Lattice is not linear.";
+         return false;
+       }
+       if (! final.String().empty()) {
+         KALDI_WARN << "Lattice has alignments on final-weight: probably "
+             "was not word-aligned (alignments will be approximate)";
+       }
+       return true;
+     } else {
+       if (num_arcs != 1) {
+         KALDI_WARN << "Lattice is not linear: num-arcs = " << num_arcs;
+         return false;
+       }
+       fst::ArcIterator<CompactLattice> aiter(clat, state);
+       const Arc &arc = aiter.Value();
+       Label word_id = arc.ilabel; // Note: ilabel==olabel, since acceptor.
+       // Also note: word_id may be zero; we output it anyway.
+       int32 length = arc.weight.String().size();
+       words->push_back(word_id);
+       begin_times->push_back(cur_time);
+       lengths->push_back(length);
+       const std::vector<int32> &arc_alignment = arc.weight.String();
+       std::vector<std::vector<int32> > split_alignment;
+       SplitToPhones(tmodel, arc_alignment, &split_alignment);
+       std::vector<int32> phones(split_alignment.size());
+       std::vector<int32> plengths(split_alignment.size());
+       for (size_t i = 0; i < split_alignment.size(); i++) {
+         KALDI_ASSERT(!split_alignment[i].empty());
+         phones[i] = tmodel.TransitionIdToPhone(split_alignment[i][0]);
+         plengths[i] = split_alignment[i].size();
+       }
+       prons->push_back(phones);
+       phone_lengths->push_back(plengths);
+ 
+       cur_time += length;
+       state = arc.nextstate;
+     }
+   }
+ }
+
 // Customized CompactLatticeToWordProns method in Kaldi to return weights
 static bool CompactLatticeToWordPronsWeight(
      const TransitionModel &tmodel,
@@ -573,28 +644,23 @@ static bool CompactLatticeToWordPronsWeight(
 	// This function computes just the phone information i.e. phone labels and lengths
 	// as single vectors
     vector<int32> words_ph_ids, times_lat, lengths;
-    vector<vector<int32> > prons, prons_lens;
-	
+    vector<vector<int32> > prons, phone_lengths;
 
     kaldi::CompactLattice best_path;
     kaldi::CompactLatticeShortestPath(clat, &best_path);
-	
-	std::vector<kaldi::BaseFloat> lm_costs; // unneeded
-    std::vector<kaldi::BaseFloat> acoustic_costs; // unneeded
 
-    CompactLatticeToWordPronsWeight(tmodel, best_path, &words_ph_ids, &times_lat, &lengths,
-                                       &prons, &prons_lens, &lm_costs, &acoustic_costs);
+    CompactLatticeToWordProns(tmodel, best_path, &words_ph_ids, &times_lat, &lengths,
+                                       &prons, &phone_lengths);
     
 
     for (size_t z = 0; z < words_ph_ids.size(); z++) {
 		for (size_t j = 0; j < prons[z].size(); j++) {   
 			auto phone_str = phone_symbol_table_.Find(prons[z][j]); 
 			phoneme_labels->push_back(phone_str);
-			auto phone_len = prons_lens[z][j];
+			auto phone_len = phone_lengths[z][j];
 			phoneme_lengths->push_back(phone_len);
 		}
 	}
-
  }
  
 void ComputePhoneInfo(const TransitionModel &tmodel, const CompactLattice &clat, const fst::SymbolTable &word_syms_, const fst::SymbolTable &phone_symbol_table_, std::vector<std::vector<std::string> > *phoneme_labels, std::vector<std::vector<int32> > *phone_lengths, std::vector<kaldi::BaseFloat> *lm_costs, std::vector<kaldi::BaseFloat> *acoustic_costs)
@@ -624,7 +690,6 @@ void ComputePhoneInfo(const TransitionModel &tmodel, const CompactLattice &clat,
       }
       phoneme_labels->push_back(word2phn);
      }
-    
 }
 
 const char * Recognizer::PhoneResult(CompactLattice &rlat)
@@ -642,7 +707,6 @@ const char * Recognizer::PhoneResult(CompactLattice &rlat)
     std::vector<kaldi::BaseFloat> acoustic_costs;
 	
 	ComputePhoneSequence(*model_->trans_model_, aligned_lat, *model_->phone_symbol_table_, &phoneme_labels, &phoneme_lengths);	
-	// change to ComputePhoneSequence later
 	
 	json::JSON res;
 	int32 time = 0;
