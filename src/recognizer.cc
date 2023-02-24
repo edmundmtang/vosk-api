@@ -683,12 +683,8 @@ const char *Recognizer::WordandPhoneResult(CompactLattice &rlat)
             //If there are silences without phone output (since they are coming from different places) then set the label and timestamps
             if (word_ids[i] == 0 && phoneme_labels[phone_ptr][0] != "SIL"){
                 word["phone_labels"].append( "SIL" );
-				if (verbose_) {
-					phone_start_time=samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].first) * 0.03;
-					phone_end_time = samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].second) * 0.03;
-					word["phone_start"].append( phone_start_time );
-					word["phone_end"].append( phone_end_time );
-				}
+				phone_start_time=samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].first) * 0.03;
+				phone_end_time = samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].second) * 0.03;
             }
 
             //Else add the information generated from ComputePhoneInfo to results
@@ -698,20 +694,18 @@ const char *Recognizer::WordandPhoneResult(CompactLattice &rlat)
                     word["phone_labels"].append( phone );
                 }
                 //Compute timestamps from phone lengths        
-				if (verbose_) {
-					for (int x=0; x < phone_lengths[phone_ptr].size(); x++){
-						if (x==0){
-							phone_start_time=samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].first) * 0.03;
-							phone_end_time = phone_start_time + (phone_lengths[phone_ptr][x]) * 0.03;
-						}
-						else{
-							phone_start_time = phone_end_time;
-							phone_end_time = phone_start_time + (phone_lengths[phone_ptr][x]) * 0.03;
-						}
-						word["phone_start"].append( phone_start_time );
-						word["phone_end"].append( phone_end_time );
-					}               
-				}
+				for (int x=0; x < phone_lengths[phone_ptr].size(); x++){
+					if (x==0){
+						phone_start_time=samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].first) * 0.03;
+						phone_end_time = phone_start_time + (phone_lengths[phone_ptr][x]) * 0.03;
+					}
+					else{
+						phone_start_time = phone_end_time;
+						phone_end_time = phone_start_time + (phone_lengths[phone_ptr][x]) * 0.03;
+					}
+					word["phone_start"].append( phone_start_time );
+					word["phone_end"].append( phone_end_time );
+				}               
                 phone_ptr += 1;
             }                
                    
