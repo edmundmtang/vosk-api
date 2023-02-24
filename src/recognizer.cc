@@ -712,7 +712,7 @@ const char *Recognizer::WordandPhoneResult(CompactLattice &rlat)
             obj["result"].append(word);
 
             if (word_ids[i] != 0){ // Don't print silence symbols
-                if (i) {
+                if (i > 1) {
                     text << " ";
                 }
                 text << model_->word_syms_->Find(word_ids[i]); 
@@ -1098,7 +1098,11 @@ const char* Recognizer::FinalResult()
     silence_weighting_ = nullptr;
     decoder_ = nullptr;
     spk_feature_ = nullptr;
-
+	
+	frame_offset_ = 0;
+	samples_processed_ = 0;
+	samples_round_start_ = 0;
+	
     return last_result_.c_str();
 }
 
