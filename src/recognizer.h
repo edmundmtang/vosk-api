@@ -49,6 +49,7 @@ class Recognizer {
         void SetMaxAlternatives(int max_alternatives);
         void SetResultOptions(const char *result_opts);
         void SetSpkModel(SpkModel *spk_model);
+		void SetVerbose(bool verbose);
         void SetWords(bool words);
         void SetNLSML(bool nlsml);
         bool AcceptWaveform(const char *data, int len);

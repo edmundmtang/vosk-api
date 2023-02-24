@@ -248,6 +248,11 @@ void Recognizer::SetResultOptions(const char *result_opts)
     result_opts_ = result_opts;
 }
 
+void Recognizer::SetVerbose(bool verbose)
+{
+	verbose_ = verbose;
+}
+
 void Recognizer::SetWords(bool words)
 {
     words_ = words;

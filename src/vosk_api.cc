@@ -108,6 +108,11 @@ void vosk_recognizer_set_words(VoskRecognizer *recognizer, int words)
     ((Recognizer *)recognizer)->SetWords((bool)words);
 }
 
+void vosk_recognizer_set_verbose(VoskRecognizer *recognizer, int verbose)
+{
+	((Recognizer *)recognizer)->SetVerbose((bool)verbose);
+}
+
 void vosk_recognizer_set_nlsml(VoskRecognizer *recognizer, int nlsml)
 {
     ((Recognizer *)recognizer)->SetNLSML((bool)nlsml);
