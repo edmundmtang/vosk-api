@@ -98,20 +98,21 @@ void vosk_recognizer_set_max_alternatives(VoskRecognizer *recognizer, int max_al
     ((Recognizer *)recognizer)->SetMaxAlternatives(max_alternatives);
 }
 
-void vosk_recognizer_set_result_options(VoskRecognizer *recognizer, const char *result_opts)
-{
-    ((Recognizer *)recognizer)->SetResultOptions(result_opts);
-}
-
-void vosk_recognizer_set_words(VoskRecognizer *recognizer, int words)
+void vosk_recognizer_set_words(VoskRecognizer *recognizer, bool words)
 {
     ((Recognizer *)recognizer)->SetWords((bool)words);
 }
 
-void vosk_recognizer_set_verbose(VoskRecognizer *recognizer, int verbose)
+void vosk_recognizer_set_phones(VoskRecognizer *recognizer, bool phones)
 {
-	((Recognizer *)recognizer)->SetVerbose((bool)verbose);
+    ((Recognizer *)recognizer)->SetPhones((bool)phones);
 }
+
+void vosk_recognizer_set_timings(VoskRecognizer *recognizer, bool timings)
+{
+    ((Recognizer *)recognizer)->SetTimings((bool)timings);
+}
+
 
 void vosk_recognizer_set_nlsml(VoskRecognizer *recognizer, int nlsml)
 {

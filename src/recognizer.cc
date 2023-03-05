@@ -243,19 +243,19 @@ void Recognizer::SetMaxAlternatives(int max_alternatives)
     max_alternatives_ = max_alternatives;
 }
 
-void Recognizer::SetResultOptions(const char *result_opts)
-{
-    result_opts_ = result_opts;
-}
-
-void Recognizer::SetVerbose(bool verbose)
-{
-	verbose_ = verbose;
-}
-
 void Recognizer::SetWords(bool words)
 {
     words_ = words;
+}
+
+void Recognizer::SetPhones(bool phones)
+{
+    phones_ = phones;
+}
+
+void Recognizer::SetTimings(bool timings)
+{
+    timings_ = timings;
 }
 
 void Recognizer::SetNLSML(bool nlsml)
@@ -452,10 +452,11 @@ const char *Recognizer::MbrResult(CompactLattice &rlat)
 
         if (words_) {
             word["word"] = model_->word_syms_->Find(words[i]);
-            word["start"] = samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].first) * 0.03;
-            word["end"] = samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].second) * 0.03;
-            word["conf"] = conf[i];
-            obj["result"].append(word);
+			if (timings_) {
+				word["start"] = samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].first) * 0.03;
+				word["end"] = samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].second) * 0.03;
+            }
+			obj["result"].append(word);
         }
 
         if (i) {
@@ -712,10 +713,12 @@ const char * Recognizer::PhoneResult(CompactLattice &rlat)
 	int32 time = 0;
 	
 	for (size_t k = 0; k < phoneme_labels.size(); k++) {
-		res["phone_labels"].append(phoneme_labels[k]);
-		res["phone_start"].append(time * 0.03);
-		time += phoneme_lengths[k];
-		res["phone_end"].append(time * 0.03);
+		res["phone_label"].append(phoneme_labels[k]);
+		if (timings_) {
+			res["phone_start"].append(time * 0.03);
+			time += phoneme_lengths[k];
+			res["phone_end"].append(time * 0.03);
+		}
 	}
 	
 	return StoreReturn(res.dump());
@@ -766,46 +769,49 @@ const char *Recognizer::WordandPhoneResult(CompactLattice &rlat)
         //filter them to generate consistent outputs
         if ((samples_round_start_ / sample_frequency_ + (frame_offset_ + (times[i].second-times[i].first)) * 0.03) > 0.0 && phone_ptr < phon_vec_size) {
             
-            word["word"] = model_->word_syms_->Find(word_ids[i]);
-			if (verbose_) {
-				word["start"] = samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].first) * 0.03;
-				word["end"] = samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].second) * 0.03;
-				word["conf"] = conf[i];
-				word["lm_cost"] = lm_costs[phone_ptr]; 
-				word["acoustic_cost"] = acoustic_costs[phone_ptr];
+			if (words_) {
+				word["word"] = model_->word_syms_->Find(word_ids[i]);
+				if (timings_) {
+					word["start"] = samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].first) * 0.03;
+					word["end"] = samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].second) * 0.03;
+				}
 			}
-
+			
             kaldi::BaseFloat phone_start_time = 0.0;
             kaldi::BaseFloat phone_end_time = 0.0;
-                        
-            //If there are silences without phone output (since they are coming from different places) then set the label and timestamps
-            if (word_ids[i] == 0 && phoneme_labels[phone_ptr][0] != "SIL"){
-                word["phone_labels"].append( "SIL" );
-				phone_start_time=samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].first) * 0.03;
-				phone_end_time = samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].second) * 0.03;
-            }
+                   
+			if (phones_) {
+				//If there are silences without phone output (since they are coming from different places) then set the label and timestamps
+				if (word_ids[i] == 0 && phoneme_labels[phone_ptr][0] != "SIL"){
+					word["phone_label"].append( "SIL" );
+					phone_start_time=samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].first) * 0.03;
+					phone_end_time = samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].second) * 0.03;
+				}
 
-            //Else add the information generated from ComputePhoneInfo to results
-            else {
-                for ( auto phone: phoneme_labels[phone_ptr]){
+				//Else add the information generated from ComputePhoneInfo to results
+				else {
+					for ( auto phone: phoneme_labels[phone_ptr]){
 
-                    word["phone_labels"].append( phone );
-                }
-                //Compute timestamps from phone lengths        
-				for (int x=0; x < phone_lengths[phone_ptr].size(); x++){
-					if (x==0){
-						phone_start_time=samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].first) * 0.03;
-						phone_end_time = phone_start_time + (phone_lengths[phone_ptr][x]) * 0.03;
+						word["phone_label"].append( phone );
 					}
-					else{
-						phone_start_time = phone_end_time;
-						phone_end_time = phone_start_time + (phone_lengths[phone_ptr][x]) * 0.03;
+					//Compute timestamps from phone lengths  
+					if (timings_) {
+						for (int x=0; x < phone_lengths[phone_ptr].size(); x++){
+							if (x==0){
+								phone_start_time=samples_round_start_ / sample_frequency_ + (frame_offset_ + times[i].first) * 0.03;
+								phone_end_time = phone_start_time + (phone_lengths[phone_ptr][x]) * 0.03;
+							}
+							else{
+								phone_start_time = phone_end_time;
+								phone_end_time = phone_start_time + (phone_lengths[phone_ptr][x]) * 0.03;
+							}
+							word["phone_start"].append( phone_start_time );
+							word["phone_end"].append( phone_end_time );
+						}  
 					}
-					word["phone_start"].append( phone_start_time );
-					word["phone_end"].append( phone_end_time );
-				}               
-                phone_ptr += 1;
-            }                
+					phone_ptr += 1;
+				} 
+			}
                    
             obj["result"].append(word);
 
@@ -937,7 +943,7 @@ const char *Recognizer::NbestResult(CompactLattice &clat)
             continue;
         if (words_) {
             word["word"] = model_->word_syms_->Find(words[i]);
-			if (verbose_) {
+			if (timings_) {
 				word["start"] = samples_round_start_ / sample_frequency_ + (frame_offset_ + begin_times[i]) * 0.03;
 				word["end"] = samples_round_start_ / sample_frequency_ + (frame_offset_ + begin_times[i] + lengths[i]) * 0.03;
 			}
@@ -1073,20 +1079,17 @@ const char* Recognizer::GetResult()
     fst::ScaleLattice(fst::GraphLatticeScale(0.9), &rlat);
 
 // Check for the results option type and generate results accordingly
-   if (max_alternatives_ == 0 && (strcmp(result_opts_, "words")) == 0) {
-        words_=1;
-        return MbrResult(rlat);
-    } else if (max_alternatives_ == 0 && strcmp(result_opts_, "phones") == 0) {        
-        if (model_->phone_syms_loaded_){         
+   if (max_alternatives_ == 0 && phones_) {
+		if (model_->phone_syms_loaded_){         
             return WordandPhoneResult(rlat);
         }
         else{             
             KALDI_ERR << "Cannot generate phone results as phone symbol table was not provided";
         }
-	}else if (max_alternatives_ == 0) {
+    } else if (max_alternatives_ == 0 && words_) {        
+        return MbrResult(rlat);
+	} else if (max_alternatives_ == 0) {
 		return MbrResult(rlat);
-    } else if (strcmp(result_opts_, "words")!=0 && strcmp(result_opts_, "phones")!=0){        
-        KALDI_ERR << "Invalid recognizer result options";
     } else if (nlsml_) {
         return NlsmlResult(rlat);
     } else {
@@ -1104,7 +1107,7 @@ const char* Recognizer::PartialResult()
     json::JSON res;
 
     if (decoder_->NumFramesDecoded() == 0) {
-        res["partial"] = "";
+        res["text"] = "";
         return StoreReturn(res.dump());
     }
 
@@ -1121,7 +1124,7 @@ const char* Recognizer::PartialResult()
         }
         text << model_->word_syms_->Find(words[i]);
     }
-    res["partial"] = text.str();
+    res["text"] = text.str();
 
     return StoreReturn(res.dump());
 }
@@ -1135,7 +1138,11 @@ const char* Recognizer::PartialPhoneResult()
 	json::JSON res;
 	
 	if (decoder_->NumFramesDecoded() == 0) {
-		res["phone_labels"] = "";
+		res["phone_label"].append("SIL");
+		if (timings_) {
+			res["phone_start"].append(0.0);
+			res["phone_end"].append(0.0);
+		}
 		return StoreReturn(res.dump());
 	}
 	
@@ -1143,7 +1150,6 @@ const char* Recognizer::PartialPhoneResult()
 	decoder_->GetLattice(false, &clat);
 	
 	// Pruned composition can return empty lattice. It should be rare
-	//   But can a normal clat do this? Not sure
 	if (clat.Start() != 0) {
        return StoreEmptyReturn();
     }
@@ -1207,7 +1213,18 @@ void Recognizer::Reset()
 const char *Recognizer::StoreEmptyReturn()
 {
     if (!max_alternatives_) {
-        return StoreReturn("{\"text\": \"\"}");
+	
+		json::JSON res;
+		if (phones_) {
+			res["phone_label"].append("SIL");
+			if (timings_) {
+				res["phone_start"].append(0.0);
+				res["phone_end"].append(0.0);
+			}
+		}
+		res["text"] = "";
+		
+        return StoreReturn(res.dump());
     } else if (nlsml_) {
         return StoreReturn("<?xml version=\"1.0\"?>\n"
                            "<result grammar=\"default\">\n"

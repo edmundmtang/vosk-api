@@ -47,10 +47,10 @@ class Recognizer {
         Recognizer(Model *model, float sample_frequency, char const *grammar);
         ~Recognizer();
         void SetMaxAlternatives(int max_alternatives);
-        void SetResultOptions(const char *result_opts);
         void SetSpkModel(SpkModel *spk_model);
-		void SetVerbose(bool verbose);
         void SetWords(bool words);
+		void SetPhones(bool phones);
+		void SetTimings(bool timings);
         void SetNLSML(bool nlsml);
         bool AcceptWaveform(const char *data, int len);
         bool AcceptWaveform(const short *sdata, int len);
@@ -100,9 +100,9 @@ class Recognizer {
 
         // Other
         int max_alternatives_ = 0; // Disable alternatives by default
-        const char *result_opts_ = "words"; // By default enable only word-level results
-		bool verbose_ = false;
         bool words_ = false;
+		bool phones_ = false;
+		bool timings_ = false;
         bool nlsml_ = false;
 
         float sample_frequency_;
